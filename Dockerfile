@@ -1,21 +1,36 @@
+FROM php:8.2-fpm
 
-FROM richarvey/nginx-php-fpm:latest
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    zip \
+    unzip \
+    git \
+    libpq-dev \
+    libpng-dev \
+    libonig-dev \
+    libxml2-dev
 
+# Install PHP extensions
+RUN docker-php-ext-install pdo pdo_mysql mbstring exif pcntl bcmath gd
+
+# Install Composer
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/bin --filename=composer
+
+# Set working directory
+WORKDIR /var/www
+
+# Copy application code
 COPY . .
 
-# Image config
-ENV SKIP_COMPOSER=1
-ENV WEBROOT=/var/www/html/public
-ENV PHP_ERRORS_STDERR=1
-ENV RUN_SCRIPTS=1
-ENV REAL_IP_HEADER=1
+# Install Laravel dependencies
+RUN composer install --no-dev --optimize-autoloader
 
-# Laravel config
-ENV APP_ENV=production
-ENV APP_DEBUG=false
-ENV LOG_CHANNEL=stderr
+# Set permissions for storage and cache
+RUN chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
 
-# Allow composer to run as root
-ENV COMPOSER_ALLOW_SUPERUSER=1
+# Expose the application port
+EXPOSE 8000
 
-CMD ["/start.sh"]
+# Start the PHP-FPM server
+CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
